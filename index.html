@@ -3,323 +3,453 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phil Chat</title>
-    <!-- Firebase SDK einbinden -->
+    <title>Phil Chat - Phase 1 (Economy & Mods)</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 
     <style>
-        /* Phil Chat - Discord Style Design */
-        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #36393f; color: #dcddde; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        /* COLOR PALETTE */
+        :root { 
+            --bg-server: #1E1F22; --bg-sidebar: #2B2D31; --bg-main: #313338; --bg-input: #383A40; 
+            --text-main: #DBDEE1; --text-muted: #949BA4; --text-dark: #80848E;
+            --accent: #5865F2; --accent-hover: #4752C4;
+            --danger: #DA373C; --bot: #5865F2; --success: #23A559; --gold: #FEE75C; --coins: #FFD700;
+        }
         
-        /* Login Screen */
-        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #2f3136; }
-        .login-box { background-color: #36393f; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); text-align: center; width: 320px; }
-        h1 { color: #fff; margin-bottom: 5px; font-size: 24px; }
-        .login-box p { font-size: 13px; color: #b9bbbe; margin-bottom: 20px; }
-        input.auth-input { width: 100%; padding: 12px; margin-bottom: 15px; background-color: #202225; border: 1px solid #202225; color: #dcddde; border-radius: 4px; outline: none; box-sizing: border-box; }
-        input.auth-input:focus { border-color: #5865F2; }
-        button.btn { background-color: #5865F2; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; font-size: 15px; transition: 0.2s; }
-        button.btn:hover { background-color: #4752C4; }
-        #error-msg { color: #ed4245; margin-top: 15px; font-size: 14px; font-weight: bold; }
+        body { margin: 0; font-family: 'gg sans', 'Segoe UI', sans-serif; background: var(--bg-main); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
+        ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-thumb { background: #1A1B1E; border-radius: 4px; } ::-webkit-scrollbar-track { background: transparent; }
+        
+        /* MODALS & BOXES */
+        #login-screen, .modal { position: absolute; top:0; left:0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100; display: flex; justify-content: center; align-items: center; }
+        .box { background: var(--bg-main); padding: 32px; border-radius: 8px; width: 340px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); text-align: center; display: flex; flex-direction: column; max-height: 80vh; overflow-y: auto; }
+        .box input, .box button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 4px; border: none; outline: none; box-sizing: border-box; font-size: 15px; }
+        .box input { background: var(--bg-server); color: var(--text-main); }
+        .box input:focus { box-shadow: 0 0 0 2px var(--accent); }
+        .box button { background: var(--accent); color: white; cursor: pointer; font-weight: 600; }
+        .box button:hover { background: var(--accent-hover); }
+        .box label { text-align: left; font-size: 12px; font-weight: bold; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; }
+        
+        /* SHOP ITEMS */
+        .shop-item { background: var(--bg-sidebar); border-radius: 8px; padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--bg-input); }
+        .shop-item button { width: auto; padding: 6px 12px; margin: 0; font-size: 12px; background: var(--success); }
+        .shop-item button:disabled { background: var(--text-dark); cursor: not-allowed; }
 
-        /* Main App Layout */
-        #app-screen { display: none; height: 100vh; flex-direction: row; }
+        /* LAYOUT */
+        #server-list { width: 72px; background: var(--bg-server); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 8px; z-index: 20; }
+        .server-icon { width: 48px; height: 48px; border-radius: 50%; background: var(--bg-main); display: flex; justify-content: center; align-items: center; cursor: pointer; font-weight: 600; font-size: 18px; transition: all 0.2s ease; color: var(--text-main); overflow: hidden; }
+        .server-icon:hover, .server-icon.active { border-radius: 16px; background-color: var(--accent); color: white; }
         
-        /* Sidebar (Friends & User Info) */
-        #sidebar { width: 250px; background-color: #2f3136; display: flex; flex-direction: column; border-right: 1px solid #202225; }
-        .sidebar-header { padding: 20px; background-color: #202225; text-align: center; font-weight: bold; color: #fff; font-size: 20px; border-bottom: 1px solid #18191c; }
-        .friends-list-container { flex: 1; padding: 15px; overflow-y: auto; }
-        .friends-list-title { font-size: 12px; font-weight: bold; color: #8e9297; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .add-friend-btn { background: none; border: none; color: #b9bbbe; cursor: pointer; font-size: 18px; line-height: 1; }
-        .add-friend-btn:hover { color: #fff; }
-        #friends-box { display: flex; flex-direction: column; gap: 8px; }
-        .friend-item { padding: 8px 10px; background-color: #36393f; border-radius: 4px; font-size: 14px; color: #8e9297; display: flex; align-items: center; gap: 10px; }
-        .friend-item.online::before { content: ''; display: inline-block; width: 10px; height: 10px; background-color: #3ba55d; border-radius: 50%; }
+        #sidebar { width: 240px; background: var(--bg-sidebar); display: flex; flex-direction: column; border-top-left-radius: 8px; }
+        .sidebar-header { padding: 16px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.2); display:flex; justify-content: space-between; align-items: center; color: white; z-index: 2; }
+        .list-container { padding: 10px 8px; overflow-y: auto; flex: 1; }
+        .nav-item { padding: 6px 8px; margin-bottom: 2px; border-radius: 4px; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
+        .nav-item.active { background: rgba(255,255,255,0.1); color: white; }
         
-        #user-panel { background-color: #292b2f; padding: 15px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-        #user-panel .username { font-weight: bold; color: #fff; }
-        #logout-btn { background: #ed4245; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-        #logout-btn:hover { background: #c03537; }
+        /* USER PANEL MIT COINS */
+        #user-panel { background: #232428; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; background-size: cover; background-position: center; background-color: var(--accent); flex-shrink: 0; }
+        .user-info { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .user-name { font-weight: 600; font-size: 14px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-stats { font-size: 11px; color: var(--text-muted); font-weight: bold; }
+        .icon-btn-panel { display: flex; gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
+        .icon-btn-panel button { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 4px; border-radius: 4px; transition: 0.2s; }
+        .icon-btn-panel button:hover { background: var(--bg-input); color: white; }
+        
+        /* CHAT */
+        #chat-area { flex: 1; display: flex; flex-direction: column; background: var(--bg-main); position: relative; }
+        #chat-header { padding: 16px; border-bottom: 1px solid rgba(0,0,0,0.15); box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-weight: 600; display: flex; justify-content: space-between; align-items: center; color: white; z-index: 2; }
+        #chat-box { flex: 1; padding: 20px 0; overflow-y: auto; display: flex; flex-direction: column; }
+        
+        .message { display: flex; gap: 16px; padding: 6px 48px 6px 72px; position: relative; margin-top: 8px; }
+        .message:hover { background: rgba(255,255,255,0.03); }
+        .msg-avatar { width: 40px; height: 40px; border-radius: 50%; background-size: cover; position: absolute; left: 16px; top: 6px; }
+        .message-content { flex: 1; display: flex; flex-direction: column; }
+        .message-header { display: flex; gap: 8px; margin-bottom: 4px; align-items: baseline; flex-wrap: wrap; }
+        .message-sender { font-weight: 600; font-size: 16px; color: white; text-shadow: 0px 0px 5px rgba(0,0,0,0.5); }
+        .message-time { font-size: 12px; color: var(--text-muted); }
+        .message-text { line-height: 1.5; font-size: 15px; color: var(--text-main); word-wrap: break-word; }
+        
+        /* Gifs & Badges */
+        .gif-embed { max-width: 250px; border-radius: 8px; margin-top: 5px; }
+        .admin-badge { background: var(--danger); color: white; font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: 600; }
+        
+        .delete-btn { display: none; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: var(--danger); color: white; border: none; border-radius: 4px; cursor: pointer; padding: 6px 12px; font-size: 12px; font-weight: bold; }
+        .message:hover .delete-btn { display: block; }
+        
+        /* INPUT AREA & GIF PICKER */
+        #input-area { padding: 0 24px 24px 24px; position: relative; }
+        .input-wrapper { display: flex; background: var(--bg-input); border-radius: 8px; padding: 0 16px; align-items: center; gap: 12px; min-height: 48px; }
+        #message-input { background: transparent; padding: 10px 0; margin: 0; width: 100%; font-size: 15px; border:none; outline:none; color: var(--text-main); }
+        .action-btn { background: transparent; color: var(--text-muted); border: none; font-size: 20px; cursor: pointer; padding: 5px; transition: 0.2s; }
+        .action-btn:hover { color: white; transform: scale(1.1); }
+        
+        #gif-picker { display: none; position: absolute; bottom: 80px; right: 30px; background: var(--bg-sidebar); border-radius: 8px; padding: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); width: 250px; flex-wrap: wrap; gap: 5px; z-index: 50; border: 1px solid var(--bg-input); }
+        .gif-item { width: 48%; height: 80px; background-size: cover; background-position: center; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .gif-item:hover { transform: scale(1.05); }
 
-        /* Chat Area */
-        #chat-area { flex: 1; display: flex; flex-direction: column; background-color: #36393f; }
-        #chat-header { background-color: #36393f; padding: 15px 20px; font-weight: bold; font-size: 16px; border-bottom: 1px solid #202225; color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        #chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .message { display: flex; flex-direction: column; }
-        .message .sender { font-weight: bold; margin-bottom: 4px; display: flex; align-items: baseline; gap: 10px; }
-        .message .time { font-size: 11px; color: #72767d; font-weight: normal; }
-        .message .text { color: #dcddde; line-height: 1.4; word-wrap: break-word; font-size: 15px; }
-        #input-area { padding: 20px; }
-        #message-input { width: 100%; background-color: #40444b; border: none; padding: 15px; border-radius: 8px; color: #dcddde; outline: none; box-sizing: border-box; font-size: 15px; }
+        /* ALERT TOAST */
+        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--danger); color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold; opacity: 0; transition: opacity 0.3s; z-index: 1000; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <!-- BEREICH 1: LOGIN / REGISTRIERUNG -->
+    <!-- Toast Notification -->
+    <div id="toast">Warnung!</div>
+
+    <!-- LOGIN -->
     <div id="login-screen">
-        <div class="login-box">
-            <h1>Phil Chat</h1>
-            <p>Sichere deinen @Namen mit einem Passwort.</p>
-            <input type="text" id="username-input" class="auth-input" placeholder="Dein @Name (z.B. Gamer123)">
-            <input type="password" id="password-input" class="auth-input" placeholder="Dein Passwort" onkeypress="handleLoginEnter(event)">
-            <button class="btn" onclick="loginOrRegister()">Beitreten / Einloggen</button>
-            <div id="error-msg"></div>
+        <div class="box">
+            <h1 style="color:white; margin-bottom: 8px;">Willkommen!</h1>
+            <input type="text" id="username-input" placeholder="@DeinName">
+            <input type="password" id="password-input" placeholder="Passwort" onkeypress="if(event.key === 'Enter') login()">
+            <button onclick="login()">Einloggen</button>
+            <div id="error-msg" style="color:var(--danger); margin-top:10px; font-size:14px; font-weight:600;"></div>
         </div>
     </div>
 
-    <!-- BEREICH 2: MAIN APP (SIDEBAR + CHAT) -->
-    <div id="app-screen">
+    <!-- SHOP MODAL -->
+    <div id="shop-modal" class="modal" style="display:none;" onclick="if(event.target==this) this.style.display='none'">
+        <div class="box">
+            <h2 style="color:var(--coins); margin-top:0;">Item Shop 🛒</h2>
+            <p style="color:var(--text-muted); font-size:13px; margin-bottom:20px;">Deine PhilCoins: <b id="shop-coin-display">0</b></p>
+            
+            <div class="shop-item">
+                <span style="color:#00ff00; font-weight:bold; text-shadow: 0 0 5px #00ff00;">Hacker Grün</span>
+                <button onclick="buyColor('#00ff00', 100)">100 🪙</button>
+            </div>
+            <div class="shop-item">
+                <span style="color:#ff00ff; font-weight:bold; text-shadow: 0 0 5px #ff00ff;">Neon Pink</span>
+                <button onclick="buyColor('#ff00ff', 250)">250 🪙</button>
+            </div>
+            <div class="shop-item">
+                <span style="color:var(--gold); font-weight:bold; text-shadow: 0 0 5px var(--gold);">Legendäres Gold</span>
+                <button onclick="buyColor('#FEE75C', 500)">500 🪙</button>
+            </div>
+            <div class="shop-item">
+                <span style="color:white; font-weight:bold;">Standard Weiß</span>
+                <button onclick="buyColor('#ffffff', 0)" style="background:var(--accent)">Gratis</button>
+            </div>
+
+            <button onclick="document.getElementById('shop-modal').style.display='none'" style="margin-top:15px; background:transparent; color:var(--text-muted);">Schließen</button>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="server-list">
+        <div class="server-wrapper">
+            <div class="server-icon active" id="home-btn" onclick="loadHome()" style="background-color: var(--accent);">🏠</div>
+        </div>
+        <div style="width: 32px; height: 2px; background: var(--bg-sidebar); border-radius: 1px; margin: 5px 0;"></div>
+        <div id="my-servers-container" style="display:flex; flex-direction:column; gap:8px; width:100%; align-items:center;"></div>
+    </div>
+
+    <div id="sidebar">
+        <div class="sidebar-header"><span id="sidebar-header-title">Privatnachrichten</span></div>
+        <div class="list-container" id="channel-list"></div>
+        <div id="user-panel">
+            <div class="avatar" id="my-avatar"></div>
+            <div class="user-info">
+                <div class="user-name" id="my-username-display"></div>
+                <div class="user-stats" id="my-stats-display">Lv. 1 | 🪙 0</div>
+            </div>
+            <div class="icon-btn-panel">
+                <button onclick="document.getElementById('shop-modal').style.display='flex'" title="Shop">🛒</button>
+                <button onclick="logout()" title="Abmelden" style="color:var(--danger)">✖</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-area">
+        <div id="chat-header">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="color:var(--text-muted); font-size:20px;">#</span><span id="chat-title">Willkommen</span>
+            </div>
+        </div>
+        <div id="chat-box"></div>
         
-        <!-- Sidebar -->
-        <div id="sidebar">
-            <div class="sidebar-header">Phil Chat</div>
-            <div class="friends-list-container">
-                <div class="friends-list-title">
-                    <span>Deine Freunde</span>
-                    <button class="add-friend-btn" onclick="addFriend()" title="Freund hinzufügen">+</button>
-                </div>
-                <div id="friends-box">
-                    <!-- Freunde werden hier geladen -->
-                </div>
+        <div id="input-area" style="display:none;">
+            <!-- GIF Picker -->
+            <div id="gif-picker">
+                <!-- Werden per JS gefüllt -->
             </div>
-            <div id="user-panel">
-                <span class="username" id="my-username-display"></span>
-                <button id="logout-btn" onclick="logout()">Logout</button>
+
+            <div class="input-wrapper">
+                <input type="text" id="message-input" placeholder="Nachricht..." onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button class="action-btn" title="GIF senden" onclick="toggleGifPicker()">🎞️</button>
             </div>
         </div>
-
-        <!-- Chat Area -->
-        <div id="chat-area">
-            <div id="chat-header"># globaler-chat</div>
-            <div id="chat-box"></div>
-            <div id="input-area">
-                <input type="text" id="message-input" placeholder="Nachricht an #globaler-chat senden..." onkeypress="handleChatEnter(event)">
-            </div>
-        </div>
-
     </div>
 
     <script>
         // ==========================================
-        // 1. FIREBASE KONFIGURATION (DEINE DATEN)
+        // 1. FIREBASE & GLOBALS
         // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyDkDP9Z7Pv7MLpS0olVq8bkwvGrle5NKsk",
             authDomain: "philpw-portal.firebaseapp.com",
-            // WICHTIG: Die Database-URL wird für die Realtime Database zwingend benötigt.
-            // Ich habe die Standard-URL für dein Projekt hinzugefügt:
             databaseURL: "https://philpw-portal-default-rtdb.europe-west1.firebasedatabase.app", 
-            projectId: "philpw-portal",
-            storageBucket: "philpw-portal.firebasestorage.app",
-            messagingSenderId: "738984400559",
-            appId: "1:738984400559:web:7acbe5a1511929c932e65a"
+            projectId: "philpw-portal"
         };
-
-        // Firebase initialisieren
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Globale Variablen
-        let myUsername = localStorage.getItem("philchat_username");
-        let myPassword = localStorage.getItem("philchat_password");
+        let myUser = { name: localStorage.getItem("pc_name"), pass: localStorage.getItem("pc_pass"), xp: 0, coins: 0, level: 1 };
+        let currentServerId = null, currentChatId = null, activeChatPath = null;
+        let lastMessageTime = 0;
 
-        // Wenn Daten gespeichert sind, versuche Auto-Login
-        if (myUsername && myPassword) {
-            verifyLogin(myUsername, myPassword);
+        // Auto-Mod Badwords
+        const badwords = ["idiot", "depp", "arsch", "hure", "bastard", "fotze"];
+
+        // Hardcoded GIFs für Phase 1
+        const gifs = [
+            "https://media.tenor.com/2cehQZ7eO3wAAAAC/popcorn-eating.gif",
+            "https://media.tenor.com/Z4XEqqHw1vAAAAAC/omg-shocked.gif",
+            "https://media.tenor.com/mO4e2R34rV8AAAAC/laughing-cat.gif",
+            "https://media.tenor.com/1DqSgS_qW-8AAAAC/crying-sad.gif"
+        ];
+
+        if (myUser.name && myUser.pass) verifyLogin();
+
+        // GIFs ins Menü laden
+        const gifPicker = document.getElementById("gif-picker");
+        gifs.forEach(url => {
+            let div = document.createElement("div");
+            div.className = "gif-item";
+            div.style.backgroundImage = `url('${url}')`;
+            div.onclick = () => { sendMessage(`[GIF]${url}`); toggleGifPicker(); };
+            gifPicker.appendChild(div);
+        });
+
+        function toggleGifPicker() {
+            gifPicker.style.display = gifPicker.style.display === "flex" ? "none" : "flex";
         }
 
         // ==========================================
-        // 2. LOGIK: LOGIN & REGISTRIERUNG
+        // 2. LOGIN & LIVE DATA (XP & COINS)
         // ==========================================
-        function handleLoginEnter(e) {
-            if (e.key === 'Enter') loginOrRegister();
+        function login() {
+            let n = document.getElementById("username-input").value.trim();
+            let p = document.getElementById("password-input").value.trim();
+            if(!n.startsWith("@")) n = "@" + n; n = n.replace(/[.#$[\]]/g, "");
+            
+            if (n.toLowerCase() === "@schleimy" && p !== "Gabel007") return document.getElementById("error-msg").innerText = "Falsches Admin-Passwort!";
+
+            db.ref("users/" + n).once("value", snap => {
+                if(snap.exists() && snap.val().password === p) initApp(n, p);
+                else if(!snap.exists()) {
+                    let d = { password: p, avatar: "https://api.dicebear.com/7.x/identicon/svg?seed="+n, xp: 0, coins: 100, color: "#ffffff" };
+                    db.ref("users/" + n).set(d).then(() => initApp(n, p));
+                } else document.getElementById("error-msg").innerText = "Falsches Passwort!";
+            });
+        }
+        function verifyLogin() { db.ref("users/" + myUser.name).once("value", snap => { if(snap.exists() && snap.val().password === myUser.pass) initApp(myUser.name, myUser.pass); }); }
+        
+        function initApp(name, pass) {
+            localStorage.setItem("pc_name", name); localStorage.setItem("pc_pass", pass);
+            document.getElementById("login-screen").style.display = "none";
+            
+            // Live-Sync für Coins & XP
+            db.ref("users/" + name).on("value", snap => {
+                if(snap.exists()) {
+                    myUser = { name, pass, ...snap.val() };
+                    myUser.level = Math.floor(Math.sqrt((myUser.xp || 0) / 20)) + 1;
+                    updateProfileUI();
+                }
+            });
+
+            fetchMyServers(); loadHome();
         }
 
-        function loginOrRegister() {
-            let rawName = document.getElementById("username-input").value.trim();
-            let pass = document.getElementById("password-input").value.trim();
-
-            if (rawName.length < 3) {
-                return showError("Der Name muss mindestens 3 Zeichen lang sein.");
-            }
-            if (pass.length < 4) {
-                return showError("Das Passwort muss mindestens 4 Zeichen lang sein.");
-            }
+        function updateProfileUI() {
+            let nameHTML = myUser.name;
+            if(myUser.name.toLowerCase() === "@schleimy") nameHTML += ' <span class="admin-badge">ADMIN</span>';
+            document.getElementById("my-username-display").innerHTML = nameHTML;
+            document.getElementById("my-username-display").style.color = myUser.color || "white";
+            document.getElementById("my-avatar").style.backgroundImage = `url('${myUser.avatar}')`;
             
-            if (!rawName.startsWith("@")) rawName = "@" + rawName;
-            const safeName = rawName.replace(/[.#$[\]]/g, ""); // Unerlaubte Zeichen entfernen
+            document.getElementById("my-stats-display").innerText = `Lv. ${myUser.level} | 🪙 ${myUser.coins || 0}`;
+            document.getElementById("shop-coin-display").innerText = myUser.coins || 0;
+        }
 
-            const userRef = db.ref("users/" + safeName);
-            
-            userRef.once("value").then((snapshot) => {
-                if (snapshot.exists()) {
-                    // Name existiert -> Passwort prüfen
-                    if (snapshot.val().password === pass) {
-                        saveAndEnter(safeName, pass);
-                    } else {
-                        showError("Falsches Passwort für diesen @Namen!");
-                    }
+        function logout() { localStorage.clear(); location.reload(); }
+
+        // ==========================================
+        // 3. SHOP SYSTEM
+        // ==========================================
+        function buyColor(colorHex, price) {
+            if ((myUser.coins || 0) >= price) {
+                let newCoins = (myUser.coins || 0) - price;
+                db.ref("users/" + myUser.name).update({ color: colorHex, coins: newCoins });
+                showToast("Farbe gekauft!");
+            } else {
+                showToast("Nicht genug PhilCoins!");
+            }
+        }
+
+        function showToast(msg) {
+            let t = document.getElementById("toast");
+            t.innerText = msg; t.style.opacity = "1";
+            setTimeout(() => t.style.opacity = "0", 3000);
+        }
+
+        // ==========================================
+        // 4. SERVER & CHAT LOGIK
+        // ==========================================
+        function fetchMyServers() {
+            db.ref("users/" + myUser.name + "/servers").on("value", snap => {
+                let container = document.getElementById("my-servers-container"); container.innerHTML = "";
+                if(!snap.exists()) {
+                    let testId = "srv_global";
+                    db.ref("servers/" + testId).set({ name: "Global Hub", owner: myUser.name, channels: { "allgemein": true } });
+                    db.ref("users/" + myUser.name + "/servers/" + testId).set(true);
                 } else {
-                    // Name ist frei -> Registrieren
-                    userRef.set({ 
-                        password: pass,
-                        created: firebase.database.ServerValue.TIMESTAMP
-                    }).then(() => {
-                        saveAndEnter(safeName, pass);
+                    Object.keys(snap.val()).forEach(serverId => {
+                        db.ref("servers/" + serverId + "/name").once("value", nameSnap => {
+                            let sName = nameSnap.val() || "S";
+                            container.innerHTML += `<div class="server-wrapper"><div class="server-icon" id="icon-${serverId}" onclick="selectServer('${serverId}')">${sName.charAt(0).toUpperCase()}</div></div>`;
+                        });
                     });
                 }
-            }).catch(error => {
-                showError("Verbindungsfehler zur Datenbank.");
-                console.error(error);
             });
         }
 
-        function verifyLogin(name, pass) {
-            db.ref("users/" + name).once("value").then((snapshot) => {
-                if (snapshot.exists() && snapshot.val().password === pass) {
-                    myUsername = name;
-                    showApp();
-                } else {
-                    logout(); // Auto-Login fehlgeschlagen
+        function loadHome() {
+            if(activeChatPath) db.ref(activeChatPath).off();
+            activeChatPath = null; currentServerId = null; currentChatId = null;
+            document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
+            document.getElementById('home-btn').classList.add('active');
+            document.getElementById('chat-box').innerHTML = ""; document.getElementById('input-area').style.display = "none";
+
+            db.ref("users/" + myUser.name + "/friends").on("value", snap => {
+                let list = document.getElementById("channel-list");
+                list.innerHTML = `<div class="list-title">Freunde <span style="cursor:pointer;" onclick="addFriend()">➕</span></div>`;
+                if(snap.exists()) {
+                    Object.keys(snap.val()).forEach(f => {
+                        list.innerHTML += `<div class="nav-item" id="nav-${f.replace('@','')}" onclick="openChat('${f}', 'dm')">👤 ${f}</div>`;
+                    });
                 }
             });
         }
 
-        function saveAndEnter(name, pass) {
-            localStorage.setItem("philchat_username", name);
-            localStorage.setItem("philchat_password", pass);
-            myUsername = name;
-            showApp();
+        function addFriend() {
+            let f = prompt("@Name:"); if(!f) return; if(!f.startsWith("@")) f = "@"+f;
+            db.ref("users/" + f).once("value", snap => { 
+                if(snap.exists()) db.ref("users/" + myUser.name + "/friends/" + f).set(true); 
+                else showToast("Benutzer nicht gefunden!"); 
+            });
         }
 
-        function logout() {
-            localStorage.removeItem("philchat_username");
-            localStorage.removeItem("philchat_password");
-            location.reload(); // Seite neu laden bringt uns zum Login zurück
+        function selectServer(serverId) {
+            currentServerId = serverId;
+            document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
+            document.getElementById('icon-' + serverId).classList.add('active');
+
+            db.ref("servers/" + serverId).on("value", snap => {
+                if(!snap.exists()) return;
+                let data = snap.val(); document.getElementById('sidebar-header-title').innerText = data.name;
+                let list = document.getElementById("channel-list"); 
+                list.innerHTML = `<div class="list-title">Textkanäle</div>`;
+                if(data.channels) {
+                    Object.keys(data.channels).forEach(c => { 
+                        list.innerHTML += `<div class="nav-item" id="nav-${c}" onclick="openChat('${c}', 'channel')"><span style="color:var(--text-dark);">#</span> ${c}</div>`; 
+                    });
+                    if(!currentChatId || !data.channels[currentChatId]) openChat(Object.keys(data.channels)[0], 'channel');
+                }
+            });
         }
 
-        function showError(msg) {
-            document.getElementById("error-msg").innerText = msg;
+        function openChat(id, type = 'channel') {
+            if(activeChatPath) { db.ref(activeChatPath).off(); }
+            currentChatId = id;
+            
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            let navEl = document.getElementById('nav-' + id.replace('@', ''));
+            if(navEl) navEl.classList.add('active');
+
+            document.getElementById('chat-title').innerText = id;
+            document.getElementById('input-area').style.display = "block"; 
+            document.getElementById("chat-box").innerHTML = "";
+
+            if(type === 'channel') activeChatPath = `servers/${currentServerId}/messages/${id}`;
+            else activeChatPath = `dms/${[myUser.name, id].sort().join("_")}/messages`;
+
+            db.ref(activeChatPath).on("child_added", snap => renderMessage(snap.key, snap.val()));
+            db.ref(activeChatPath).on("child_removed", snap => document.getElementById("msg-" + snap.key)?.remove());
         }
 
         // ==========================================
-        // 3. LOGIK: MAIN APP & CHAT
+        // 5. SENDEN & AUTO-MOD & SLOWMODE
         // ==========================================
-        let chatLoaded = false;
+        function sendMessage(overrideText = null) {
+            let input = document.getElementById("message-input"); 
+            let text = overrideText || input.value.trim();
+            if (!text) return;
 
-        function showApp() {
-            document.getElementById("login-screen").style.display = "none";
-            document.getElementById("app-screen").style.display = "flex";
-            document.getElementById("my-username-display").innerText = myUsername;
-            
-            loadFriends();
-            
-            if (!chatLoaded) {
-                loadMessages();
-                chatLoaded = true;
+            // SLOWMODE CHECK (3 Sekunden)
+            if (Date.now() - lastMessageTime < 3000) {
+                return showToast("Slowmode! Bitte warte 3 Sekunden.");
             }
-        }
 
-        function handleChatEnter(e) {
-            if (e.key === 'Enter') sendMessage();
-        }
+            // AUTO-MOD (Wortfilter)
+            let cleanText = text;
+            badwords.forEach(bw => {
+                let regex = new RegExp(bw, "gi");
+                cleanText = cleanText.replace(regex, "***");
+            });
 
-        function sendMessage() {
-            const input = document.getElementById("message-input");
-            const text = input.value.trim();
-            if (text === "") return;
+            db.ref(activeChatPath).push({
+                sender: myUser.name, 
+                avatar: myUser.avatar, 
+                color: myUser.color || "#ffffff",
+                text: cleanText,
+                timestamp: firebase.database.ServerValue.TIMESTAMP 
+            });
+            
+            // WIRTSCHAFT: +5 Coins, +10 XP
+            if (!overrideText) {
+                let newCoins = (myUser.coins || 0) + 5;
+                let newXp = (myUser.xp || 0) + 10;
+                db.ref("users/" + myUser.name).update({ coins: newCoins, xp: newXp });
+            }
 
-            const msgData = {
-                sender: myUsername,
-                text: text,
-                timestamp: firebase.database.ServerValue.TIMESTAMP
-            };
-
-            db.ref("messages").push(msgData);
+            lastMessageTime = Date.now();
             input.value = "";
         }
 
-        function loadMessages() {
-            const chatBox = document.getElementById("chat-box");
+        function renderMessage(msgId, msg) {
+            let box = document.getElementById("chat-box");
+            let time = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             
-            db.ref("messages").on("child_added", (snapshot) => {
-                const msg = snapshot.val();
-                const date = new Date(msg.timestamp);
-                const timeString = date.getHours().toString().padStart(2, '0') + ":" + 
-                                   date.getMinutes().toString().padStart(2, '0');
-
-                const msgDiv = document.createElement("div");
-                msgDiv.className = "message";
-                
-                const senderColor = (msg.sender === myUsername) ? "#5865F2" : "#fff";
-
-                msgDiv.innerHTML = `
-                    <div class="sender" style="color: ${senderColor}">
-                        ${msg.sender} <span class="time">${timeString}</span>
-                    </div>
-                    <div class="text">${escapeHTML(msg.text)}</div>
-                `;
-                
-                chatBox.appendChild(msgDiv);
-                chatBox.scrollTop = chatBox.scrollHeight;
-            });
-        }
-
-        function escapeHTML(str) {
-            return str.replace(/[&<>'"]/g, 
-                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
-            );
-        }
-
-        // ==========================================
-        // 4. LOGIK: FREUNDE SYSTEM
-        // ==========================================
-        function addFriend() {
-            let friendName = prompt("Wie lautet der @Name deines Freundes?");
-            if (!friendName) return;
+            let adminHTML = msg.sender.toLowerCase() === "@schleimy" ? `<span class="admin-badge">ADMIN</span>` : "";
+            let nameColor = msg.color || "white";
             
-            friendName = friendName.trim();
-            if (!friendName.startsWith("@")) friendName = "@" + friendName;
-            const safeFriendName = friendName.replace(/[.#$[\]]/g, "");
-
-            if (safeFriendName === myUsername) {
-                alert("Du kannst dich nicht selbst hinzufügen!");
-                return;
+            // Text Rendering (HTML Escaping + GIF Check)
+            let content = msg.text ? msg.text.replace(/</g, "&lt;") : "";
+            
+            if (content.startsWith("[GIF]")) {
+                let gifUrl = content.replace("[GIF]", "");
+                content = `<img src="${gifUrl}" class="gif-embed">`;
             }
 
-            // Prüfen ob der Freund in der Datenbank existiert
-            db.ref("users/" + safeFriendName).once("value").then(snapshot => {
-                if (snapshot.exists()) {
-                    // Freund existiert! In die eigene Liste eintragen
-                    db.ref("users/" + myUsername + "/friends/" + safeFriendName).set(true);
-                    alert(safeFriendName + " wurde zu deinen Freunden hinzugefügt!");
-                } else {
-                    alert("Diesen Benutzer gibt es leider nicht.");
-                }
-            });
-        }
+            let deleteBtn = (msg.sender === myUser.name || myUser.name.toLowerCase() === "@schleimy") 
+                ? `<button class="delete-btn" onclick="db.ref('${activeChatPath}/${msgId}').remove()">Löschen</button>` : "";
 
-        function loadFriends() {
-            const friendsBox = document.getElementById("friends-box");
-            
-            // Hört auf Änderungen in deiner Freundesliste
-            db.ref("users/" + myUsername + "/friends").on("value", (snapshot) => {
-                friendsBox.innerHTML = ""; // Box leeren
-                
-                if (snapshot.exists()) {
-                    const friends = snapshot.val();
-                    // Für jeden Freund in der Liste ein Element erstellen
-                    for (const friendName in friends) {
-                        const friendDiv = document.createElement("div");
-                        friendDiv.className = "friend-item online"; // Standardmäßig "online" Punkt anzeigen
-                        friendDiv.innerText = friendName;
-                        friendsBox.appendChild(friendDiv);
-                    }
-                } else {
-                    friendsBox.innerHTML = "<span style='font-size:12px; color:#72767d;'>Noch keine Freunde.</span>";
-                }
-            });
+            let div = document.createElement("div");
+            div.className = "message"; div.id = "msg-" + msgId;
+            div.innerHTML = `
+                ${deleteBtn}
+                <div class="msg-avatar" style="background-image: url('${msg.avatar}')"></div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-sender" style="color:${nameColor}; text-shadow: 0 0 5px ${nameColor};">${msg.sender}</span> ${adminHTML} <span class="message-time">${time}</span>
+                    </div>
+                    <div class="message-text">${content}</div>
+                </div>
+            `;
+            box.appendChild(div); 
+            setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
         }
     </script>
 </body>
