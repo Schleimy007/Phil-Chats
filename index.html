@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phil Chat</title>
+    <!-- Firebase SDK einbinden -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        /* Phil Chat - Discord Style Design */
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #36393f; color: #dcddde; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* Login Screen */
+        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #2f3136; }
+        .login-box { background-color: #36393f; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); text-align: center; width: 320px; }
+        h1 { color: #fff; margin-bottom: 5px; font-size: 24px; }
+        .login-box p { font-size: 13px; color: #b9bbbe; margin-bottom: 20px; }
+        input.auth-input { width: 100%; padding: 12px; margin-bottom: 15px; background-color: #202225; border: 1px solid #202225; color: #dcddde; border-radius: 4px; outline: none; box-sizing: border-box; }
+        input.auth-input:focus { border-color: #5865F2; }
+        button.btn { background-color: #5865F2; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; font-size: 15px; transition: 0.2s; }
+        button.btn:hover { background-color: #4752C4; }
+        #error-msg { color: #ed4245; margin-top: 15px; font-size: 14px; font-weight: bold; }
+
+        /* Main App Layout */
+        #app-screen { display: none; height: 100vh; flex-direction: row; }
+        
+        /* Sidebar (Friends & User Info) */
+        #sidebar { width: 250px; background-color: #2f3136; display: flex; flex-direction: column; border-right: 1px solid #202225; }
+        .sidebar-header { padding: 20px; background-color: #202225; text-align: center; font-weight: bold; color: #fff; font-size: 20px; border-bottom: 1px solid #18191c; }
+        .friends-list-container { flex: 1; padding: 15px; overflow-y: auto; }
+        .friends-list-title { font-size: 12px; font-weight: bold; color: #8e9297; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .add-friend-btn { background: none; border: none; color: #b9bbbe; cursor: pointer; font-size: 18px; line-height: 1; }
+        .add-friend-btn:hover { color: #fff; }
+        #friends-box { display: flex; flex-direction: column; gap: 8px; }
+        .friend-item { padding: 8px 10px; background-color: #36393f; border-radius: 4px; font-size: 14px; color: #8e9297; display: flex; align-items: center; gap: 10px; }
+        .friend-item.online::before { content: ''; display: inline-block; width: 10px; height: 10px; background-color: #3ba55d; border-radius: 50%; }
+        
+        #user-panel { background-color: #292b2f; padding: 15px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        #user-panel .username { font-weight: bold; color: #fff; }
+        #logout-btn { background: #ed4245; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        #logout-btn:hover { background: #c03537; }
+
+        /* Chat Area */
+        #chat-area { flex: 1; display: flex; flex-direction: column; background-color: #36393f; }
+        #chat-header { background-color: #36393f; padding: 15px 20px; font-weight: bold; font-size: 16px; border-bottom: 1px solid #202225; color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        #chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .message { display: flex; flex-direction: column; }
+        .message .sender { font-weight: bold; margin-bottom: 4px; display: flex; align-items: baseline; gap: 10px; }
+        .message .time { font-size: 11px; color: #72767d; font-weight: normal; }
+        .message .text { color: #dcddde; line-height: 1.4; word-wrap: break-word; font-size: 15px; }
+        #input-area { padding: 20px; }
+        #message-input { width: 100%; background-color: #40444b; border: none; padding: 15px; border-radius: 8px; color: #dcddde; outline: none; box-sizing: border-box; font-size: 15px; }
+    </style>
+</head>
+<body>
+
+    <!-- BEREICH 1: LOGIN / REGISTRIERUNG -->
+    <div id="login-screen">
+        <div class="login-box">
+            <h1>Phil Chat</h1>
+            <p>Sichere deinen @Namen mit einem Passwort.</p>
+            <input type="text" id="username-input" class="auth-input" placeholder="Dein @Name (z.B. Gamer123)">
+            <input type="password" id="password-input" class="auth-input" placeholder="Dein Passwort" onkeypress="handleLoginEnter(event)">
+            <button class="btn" onclick="loginOrRegister()">Beitreten / Einloggen</button>
+            <div id="error-msg"></div>
+        </div>
+    </div>
+
+    <!-- BEREICH 2: MAIN APP (SIDEBAR + CHAT) -->
+    <div id="app-screen">
+        
+        <!-- Sidebar -->
+        <div id="sidebar">
+            <div class="sidebar-header">Phil Chat</div>
+            <div class="friends-list-container">
+                <div class="friends-list-title">
+                    <span>Deine Freunde</span>
+                    <button class="add-friend-btn" onclick="addFriend()" title="Freund hinzufügen">+</button>
+                </div>
+                <div id="friends-box">
+                    <!-- Freunde werden hier geladen -->
+                </div>
+            </div>
+            <div id="user-panel">
+                <span class="username" id="my-username-display"></span>
+                <button id="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div id="chat-area">
+            <div id="chat-header"># globaler-chat</div>
+            <div id="chat-box"></div>
+            <div id="input-area">
+                <input type="text" id="message-input" placeholder="Nachricht an #globaler-chat senden..." onkeypress="handleChatEnter(event)">
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. FIREBASE KONFIGURATION (DEINE DATEN)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDkDP9Z7Pv7MLpS0olVq8bkwvGrle5NKsk",
+            authDomain: "philpw-portal.firebaseapp.com",
+            // WICHTIG: Die Database-URL wird für die Realtime Database zwingend benötigt.
+            // Ich habe die Standard-URL für dein Projekt hinzugefügt:
+            databaseURL: "https://philpw-portal-default-rtdb.europe-west1.firebasedatabase.app", 
+            projectId: "philpw-portal",
+            storageBucket: "philpw-portal.firebasestorage.app",
+            messagingSenderId: "738984400559",
+            appId: "1:738984400559:web:7acbe5a1511929c932e65a"
+        };
+
+        // Firebase initialisieren
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Globale Variablen
+        let myUsername = localStorage.getItem("philchat_username");
+        let myPassword = localStorage.getItem("philchat_password");
+
+        // Wenn Daten gespeichert sind, versuche Auto-Login
+        if (myUsername && myPassword) {
+            verifyLogin(myUsername, myPassword);
+        }
+
+        // ==========================================
+        // 2. LOGIK: LOGIN & REGISTRIERUNG
+        // ==========================================
+        function handleLoginEnter(e) {
+            if (e.key === 'Enter') loginOrRegister();
+        }
+
+        function loginOrRegister() {
+            let rawName = document.getElementById("username-input").value.trim();
+            let pass = document.getElementById("password-input").value.trim();
+
+            if (rawName.length < 3) {
+                return showError("Der Name muss mindestens 3 Zeichen lang sein.");
+            }
+            if (pass.length < 4) {
+                return showError("Das Passwort muss mindestens 4 Zeichen lang sein.");
+            }
+            
+            if (!rawName.startsWith("@")) rawName = "@" + rawName;
+            const safeName = rawName.replace(/[.#$[\]]/g, ""); // Unerlaubte Zeichen entfernen
+
+            const userRef = db.ref("users/" + safeName);
+            
+            userRef.once("value").then((snapshot) => {
+                if (snapshot.exists()) {
+                    // Name existiert -> Passwort prüfen
+                    if (snapshot.val().password === pass) {
+                        saveAndEnter(safeName, pass);
+                    } else {
+                        showError("Falsches Passwort für diesen @Namen!");
+                    }
+                } else {
+                    // Name ist frei -> Registrieren
+                    userRef.set({ 
+                        password: pass,
+                        created: firebase.database.ServerValue.TIMESTAMP
+                    }).then(() => {
+                        saveAndEnter(safeName, pass);
+                    });
+                }
+            }).catch(error => {
+                showError("Verbindungsfehler zur Datenbank.");
+                console.error(error);
+            });
+        }
+
+        function verifyLogin(name, pass) {
+            db.ref("users/" + name).once("value").then((snapshot) => {
+                if (snapshot.exists() && snapshot.val().password === pass) {
+                    myUsername = name;
+                    showApp();
+                } else {
+                    logout(); // Auto-Login fehlgeschlagen
+                }
+            });
+        }
+
+        function saveAndEnter(name, pass) {
+            localStorage.setItem("philchat_username", name);
+            localStorage.setItem("philchat_password", pass);
+            myUsername = name;
+            showApp();
+        }
+
+        function logout() {
+            localStorage.removeItem("philchat_username");
+            localStorage.removeItem("philchat_password");
+            location.reload(); // Seite neu laden bringt uns zum Login zurück
+        }
+
+        function showError(msg) {
+            document.getElementById("error-msg").innerText = msg;
+        }
+
+        // ==========================================
+        // 3. LOGIK: MAIN APP & CHAT
+        // ==========================================
+        let chatLoaded = false;
+
+        function showApp() {
+            document.getElementById("login-screen").style.display = "none";
+            document.getElementById("app-screen").style.display = "flex";
+            document.getElementById("my-username-display").innerText = myUsername;
+            
+            loadFriends();
+            
+            if (!chatLoaded) {
+                loadMessages();
+                chatLoaded = true;
+            }
+        }
+
+        function handleChatEnter(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        function sendMessage() {
+            const input = document.getElementById("message-input");
+            const text = input.value.trim();
+            if (text === "") return;
+
+            const msgData = {
+                sender: myUsername,
+                text: text,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            };
+
+            db.ref("messages").push(msgData);
+            input.value = "";
+        }
+
+        function loadMessages() {
+            const chatBox = document.getElementById("chat-box");
+            
+            db.ref("messages").on("child_added", (snapshot) => {
+                const msg = snapshot.val();
+                const date = new Date(msg.timestamp);
+                const timeString = date.getHours().toString().padStart(2, '0') + ":" + 
+                                   date.getMinutes().toString().padStart(2, '0');
+
+                const msgDiv = document.createElement("div");
+                msgDiv.className = "message";
+                
+                const senderColor = (msg.sender === myUsername) ? "#5865F2" : "#fff";
+
+                msgDiv.innerHTML = `
+                    <div class="sender" style="color: ${senderColor}">
+                        ${msg.sender} <span class="time">${timeString}</span>
+                    </div>
+                    <div class="text">${escapeHTML(msg.text)}</div>
+                `;
+                
+                chatBox.appendChild(msgDiv);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
+        // ==========================================
+        // 4. LOGIK: FREUNDE SYSTEM
+        // ==========================================
+        function addFriend() {
+            let friendName = prompt("Wie lautet der @Name deines Freundes?");
+            if (!friendName) return;
+            
+            friendName = friendName.trim();
+            if (!friendName.startsWith("@")) friendName = "@" + friendName;
+            const safeFriendName = friendName.replace(/[.#$[\]]/g, "");
+
+            if (safeFriendName === myUsername) {
+                alert("Du kannst dich nicht selbst hinzufügen!");
+                return;
+            }
+
+            // Prüfen ob der Freund in der Datenbank existiert
+            db.ref("users/" + safeFriendName).once("value").then(snapshot => {
+                if (snapshot.exists()) {
+                    // Freund existiert! In die eigene Liste eintragen
+                    db.ref("users/" + myUsername + "/friends/" + safeFriendName).set(true);
+                    alert(safeFriendName + " wurde zu deinen Freunden hinzugefügt!");
+                } else {
+                    alert("Diesen Benutzer gibt es leider nicht.");
+                }
+            });
+        }
+
+        function loadFriends() {
+            const friendsBox = document.getElementById("friends-box");
+            
+            // Hört auf Änderungen in deiner Freundesliste
+            db.ref("users/" + myUsername + "/friends").on("value", (snapshot) => {
+                friendsBox.innerHTML = ""; // Box leeren
+                
+                if (snapshot.exists()) {
+                    const friends = snapshot.val();
+                    // Für jeden Freund in der Liste ein Element erstellen
+                    for (const friendName in friends) {
+                        const friendDiv = document.createElement("div");
+                        friendDiv.className = "friend-item online"; // Standardmäßig "online" Punkt anzeigen
+                        friendDiv.innerText = friendName;
+                        friendsBox.appendChild(friendDiv);
+                    }
+                } else {
+                    friendsBox.innerHTML = "<span style='font-size:12px; color:#72767d;'>Noch keine Freunde.</span>";
+                }
+            });
+        }
+    </script>
+</body>
+</html>
